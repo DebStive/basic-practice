@@ -1,59 +1,91 @@
 
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js";
 
-// ======================================
+// ============================================
 // 1. LOAD PROJECT
-// ======================================
+// ============================================
 
 async function startGame() {
 
     const response = await fetch("./project.json");
 
     if (!response.ok) {
-        throw new Error("Cannot load project.json");
+        throw new Error("Cannot find project.json");
     }
 
     const data = await response.json();
-
     const loader = new THREE.ObjectLoader();
+
     const scene = loader.parse(data.scene);
-
-    scene.background = new THREE.Color(0x555963);
-
-    // ======================================
-    // 2. FIND PLAYER AND FLOOR
-    // ======================================
 
     const player = scene.getObjectByName("Player");
     const floor = scene.getObjectByName("Floor");
 
     if (!player || !floor) {
-        throw new Error("Player or Floor missing!");
+        throw new Error("Player or Floor is missing!");
     }
+
+    // ============================================
+    // 2. FIX FLOOR VISIBILITY
+    // ============================================
+
+    floor.material.side = THREE.DoubleSide;
+    floor.material.needsUpdate = true;
+
+    floor.material.color.set(0xffffff);
 
     scene.updateMatrixWorld(true);
 
     const floorBox = new THREE.Box3().setFromObject(floor);
+    const floorCenter = new THREE.Vector3();
 
-    const playerRadius = 0.35;
-    const playerHeight = 2;
+    floorBox.getCenter(floorCenter);
 
-    // ======================================
-    // 3. PLAYER SPAWN
-    // ======================================
+    // ============================================
+    // 3. LIGHTING
+    // ============================================
 
-    player.position.set(
-        0,
-        floorBox.max.y + playerHeight / 2,
-        -10
+    scene.background = new THREE.Color(0x252525);
+
+    scene.add(
+        new THREE.HemisphereLight(
+            0xffffff,
+            0x555555,
+            2
+        )
     );
 
-    player.rotation.set(0, Math.PI, 0);
+    const sunlight = new THREE.DirectionalLight(
+        0xffffff,
+        2
+    );
+
+    sunlight.position.set(10, 20, 10);
+    scene.add(sunlight);
+
+    // ============================================
+    // 4. PLAYER
+    // ============================================
+
     player.visible = false;
 
-    // ======================================
-    // 4. FIRST PERSON CAMERA
-    // ======================================
+    // Remove the exported capsule's scaling
+    player.scale.set(1, 1, 1);
+
+    // Spawn at the actual center of the floor
+    player.position.set(
+        floorCenter.x,
+        floorBox.max.y,
+        floorCenter.z
+    );
+
+    player.rotation.set(0, 0, 0);
+
+    const playerRadius = 0.35;
+
+    // ============================================
+    // 5. CAMERA
+    // ============================================
 
     const camera = new THREE.PerspectiveCamera(
         75,
@@ -64,55 +96,71 @@ async function startGame() {
 
     player.add(camera);
 
-    const cameraHeight = 1.2;
+    const cameraHeight = 1.6;
 
     camera.position.set(0, cameraHeight, 0);
-    camera.rotation.set(-0.12, 0, 0);
 
-    // ======================================
-    // 5. RENDERER
-    // ======================================
+    // ============================================
+    // 6. RENDERER
+    // ============================================
 
     const renderer = new THREE.WebGLRenderer({
         antialias: true
     });
 
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(
+        window.innerWidth,
+        window.innerHeight
+    );
 
     renderer.setPixelRatio(
         Math.min(window.devicePixelRatio, 2)
     );
 
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     renderer.outputColorSpace = THREE.SRGBColorSpace;
+
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.2;
 
     document.body.style.margin = "0";
     document.body.style.overflow = "hidden";
 
     document.body.appendChild(renderer.domElement);
 
-    // ======================================
-    // 6. LIGHTING
-    // ======================================
+    // ============================================
+    // 7. MOUSE CONTROL
+    // ============================================
 
-    scene.traverse((object) => {
-        if (object.isLight) {
-            object.castShadow = true;
+    let pitch = 0;
+    const sensitivity = 0.002;
+
+    function lockMouse() {
+        renderer.domElement.requestPointerLock();
+    }
+
+    const playButton = document.getElementById("startButton");
+
+    if (playButton) {
+        playButton.addEventListener("click", lockMouse);
+    }
+
+    renderer.domElement.addEventListener("click", () => {
+        if (document.pointerLockElement !== renderer.domElement) {
+            lockMouse();
         }
     });
 
-    // ======================================
-    // 7. MOUSE LOOK
-    // ======================================
+    const instructions = document.getElementById("instructions");
 
-    let pitch = -0.12;
-    const sensitivity = 0.002;
-
-    renderer.domElement.addEventListener("click", () => {
-        renderer.domElement.requestPointerLock();
+    document.addEventListener("pointerlockchange", () => {
+        if (instructions) {
+            instructions.style.display =
+                document.pointerLockElement === renderer.domElement
+                    ? "none"
+                    : "flex";
+        }
     });
 
     document.addEventListener("mousemove", (event) => {
@@ -134,33 +182,9 @@ async function startGame() {
         camera.rotation.x = pitch;
     });
 
-    // ======================================
-    // 8. PLAY BUTTON
-    // ======================================
-
-    const startButton = document.getElementById("startButton");
-    const instructions = document.getElementById("instructions");
-
-    if (startButton) {
-        startButton.addEventListener("click", () => {
-            renderer.domElement.requestPointerLock();
-        });
-    }
-
-    document.addEventListener("pointerlockchange", () => {
-
-        if (instructions) {
-            instructions.style.display =
-                document.pointerLockElement === renderer.domElement
-                    ? "none"
-                    : "flex";
-        }
-
-    });
-
-    // ======================================
-    // 9. KEYBOARD
-    // ======================================
+    // ============================================
+    // 8. KEYBOARD
+    // ============================================
 
     const keys = {};
 
@@ -178,26 +202,22 @@ async function startGame() {
         });
     });
 
-    // ======================================
-    // 10. MOVEMENT SETTINGS
-    // ======================================
+    // ============================================
+    // 9. MOVEMENT
+    // ============================================
 
     const clock = new THREE.Clock();
 
     const speed = 5;
 
-    let bobTime = 0;
-
-    const bobAmount = 0.055;
-    const bobSpeed = 11;
-
     const forward = new THREE.Vector3();
     const right = new THREE.Vector3();
     const movement = new THREE.Vector3();
 
-    // ======================================
-    // 11. PLAYER MOVEMENT
-    // ======================================
+    let bobTime = 0;
+
+    const bobAmount = 0.055;
+    const bobSpeed = 11;
 
     function updateMovement(delta) {
 
@@ -217,12 +237,12 @@ async function startGame() {
 
         if (keys["KeyW"]) movement.add(forward);
         if (keys["KeyS"]) movement.sub(forward);
-        if (keys["KeyD"]) movement.add(right);
         if (keys["KeyA"]) movement.sub(right);
+        if (keys["KeyD"]) movement.add(right);
 
-        const isMoving = movement.lengthSq() > 0;
+        const moving = movement.lengthSq() > 0;
 
-        if (isMoving) {
+        if (moving) {
 
             movement.normalize();
 
@@ -233,7 +253,7 @@ async function startGame() {
                 speed * delta
             );
 
-            // FLOOR COLLISION
+            // FLOOR BOUNDARIES
             next.x = THREE.MathUtils.clamp(
                 next.x,
                 floorBox.min.x + playerRadius,
@@ -249,7 +269,7 @@ async function startGame() {
             player.position.x = next.x;
             player.position.z = next.z;
 
-            // CAMERA BOUNCE
+            // WALKING CAMERA BOUNCE
             bobTime += delta * bobSpeed;
 
             camera.position.y =
@@ -260,7 +280,7 @@ async function startGame() {
 
         } else {
 
-            // RETURN TO REST POSITION
+            // SMOOTH CAMERA RESET
             camera.position.y = THREE.MathUtils.damp(
                 camera.position.y,
                 cameraHeight,
@@ -274,13 +294,12 @@ async function startGame() {
                 8,
                 delta
             );
-
         }
     }
 
-    // ======================================
-    // 12. GAME LOOP
-    // ======================================
+    // ============================================
+    // 10. GAME LOOP
+    // ============================================
 
     function animate() {
 
@@ -298,9 +317,9 @@ async function startGame() {
 
     animate();
 
-    // ======================================
-    // 13. RESIZE
-    // ======================================
+    // ============================================
+    // 11. RESIZE
+    // ============================================
 
     window.addEventListener("resize", () => {
 
@@ -312,17 +331,13 @@ async function startGame() {
             window.innerWidth,
             window.innerHeight
         );
-
-        renderer.setPixelRatio(
-            Math.min(window.devicePixelRatio, 2)
-        );
     });
 
-    console.log("3D GAME READY!");
-    console.log("Player:", player);
-    console.log("Floor:", floor);
+    console.log("GAME SUCCESSFULLY LOADED");
+    console.log("Floor:", floorBox);
+    console.log("Player:", player.position);
 }
 
 startGame().catch(error => {
-    console.error("GAME ERROR:", error);
+    console.error("GAME FAILED:", error);
 });
