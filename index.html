@@ -1,0 +1,139 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>3D First Person Game</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        #crosshair {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            width: 5px;
+            height: 5px;
+            background: white;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #instructions {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 12px;
+            background: rgba(0, 0, 0, 0.75);
+            color: white;
+            z-index: 20;
+            text-align: center;
+        }
+
+        #instructions h1 {
+            font-size: 32px;
+            letter-spacing: 5px;
+        }
+
+        #instructions p {
+            color: #aaa;
+            font-size: 14px;
+        }
+
+        #startButton {
+            padding: 14px 35px;
+            border: 1px solid white;
+            background: transparent;
+            color: white;
+            font-size: 15px;
+            letter-spacing: 3px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        #startButton:hover {
+            background: white;
+            color: black;
+        }
+
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            color: white;
+            font-size: 12px;
+            opacity: 0.6;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="instructions">
+        <h1>3D WORLD</h1>
+        <p>FIRST PERSON EXPERIENCE</p>
+        <button id="startButton">PLAY</button>
+        <p>WASD TO MOVE · MOUSE TO LOOK</p>
+    </div>
+
+    <div id="crosshair"></div>
+
+    <div id="controls">
+        WASD - MOVE<br>
+        MOUSE - LOOK<br>
+        ESC - PAUSE
+    </div>
+
+    <script type="module" src="./main.js"></script>
+
+    <script>
+        const instructions = document.getElementById("instructions");
+        const startButton = document.getElementById("startButton");
+
+        startButton.addEventListener("click", async () => {
+            try {
+                await document.body.requestPointerLock();
+            } catch (error) {
+                console.error("Pointer lock failed:", error);
+            }
+        });
+
+        document.addEventListener("pointerlockchange", () => {
+            instructions.style.display =
+                document.pointerLockElement === document.body
+                    ? "none"
+                    : "flex";
+        });
+    </script>
+
+</body>
+</html>
